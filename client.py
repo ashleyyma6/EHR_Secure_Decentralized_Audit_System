@@ -106,22 +106,23 @@ class audit_company(client):
         self.role = 1
         self.actionHistory = [] # record structure? only store record ID/hash
 
-
-
 def load_patient_record():
     print()
 
-def export_client(client):
-    jsonStr = json.dumps(client.__dict__)
-    # print(jsonStr)
+def export_client(client_list):
+    jsonStr = json.dumps([client.__dict__ for client in client_list])
+    print(jsonStr)
     return jsonStr
 
 def load_client(json_str):
     l = json.loads(json_str)
     # print(l)
-    t_patient = patient()
-    t_patient.recover_client(l['role'], l['ID'], l['username'], l['auth'], l['keypair'], l['prvKey_hash'], l['patientRecord'], l['patientRecordUsage'])
-    t_patient.check_variables()
+    p_list = []
+    for item in l:
+        t_patient = patient()
+        t_patient.recover_client(item['role'], item['ID'], item['username'], item['auth'], item['keypair'], item['prvKey_hash'], item['patientRecord'], item['patientRecordUsage'])
+        t_patient.check_variables()
+        p_list.append(t_patient)
 
 test_patient = patient()
 test_patient.setup_new_client('alice','password')
@@ -130,5 +131,5 @@ test_patient2 = patient()
 test_patient2.setup_new_client('bob','password')
 p_list = [test_patient,test_patient2]
 
-jsonS = export_client(test_patient)
-# load_client(jsonS)
+jsonS = export_client(p_list)
+load_client(jsonS)
