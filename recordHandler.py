@@ -11,6 +11,15 @@ class record():
         self.content = None # str
         self.recordID = None # int, record ID
     
+    def _as_dict_(self):
+        dict = {
+            'date_time':self.date_time,
+            'patientID':self.patientID,
+            'content':self.content,
+            'recordID':self.recordID
+        }
+        return dict
+
     def create_new_record(self,patientID,content):
         self.date_time = str(datetime.datetime.now()) #
         self.patientID = patientID
@@ -25,7 +34,9 @@ class record():
 
     def gen_hash(self):
         record = self.date_time+str(self.patientID)+self.content
-        return hashlib.sha256(record.encode()).digest()
+        hash = hashlib.sha256(record.encode()).digest()
+        hash = int.from_bytes(hash, "big")
+        return hash
     
     def print_record(self):
         print("Record ID: ",self.recordID)
@@ -38,23 +49,17 @@ def recover_record_from_json(json_dic):
     rec.recover_record(json_dic['date_time'], json_dic['patientID'], json_dic['content'], json_dic['recordID'])
     return rec
 
-
-def decrypt_query_result(encrypted_records, private_key):
-    decrypted_records = []
+def decrypt_query_result(encrypted_record, private_key):
     key = RSA.import_key(private_key)
     cipher = PKCS1_OAEP.new(key)
-    for item in encrypted_records:
-        plaintext = cipher.decrypt(item)
-        decrypted_records.append(plaintext.decode())
-    return decrypted_records
+    plaintext = cipher.decrypt(encrypted_record)
+    return plaintext.decode()
 
 def get_query_result(private_key):
     with open('query_result.json', 'r') as file:
         data = json.load(file)
-        decrypted_list = decrypt_query_result(data,private_key)
-        record_list = []
-        print("==== Record ====")
-        for item in decrypted_list:
-            r = recover_record_from_json(item)
-            r.print_record()
-            print("-------")
+        data = data.to_bytes((data.bit_length()+7)//8,'big')
+        decrypted = decrypt_query_result(data, private_key)
+        decrtpted_r = recover_record_from_json(json.loads(decrypted))
+        decrtpted_r.print_record()
+        print("-------")
