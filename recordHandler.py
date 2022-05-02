@@ -3,6 +3,10 @@ import hashlib
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 import json
+from Crypto.Random import get_random_bytes
+from Crypto.Cipher import AES
+import sys
+
 
 class record():
     def __init__(self):
@@ -58,8 +62,30 @@ def decrypt_query_result(encrypted_record, private_key):
 def get_query_result(private_key):
     with open('query_result.json', 'r') as file:
         data = json.load(file)
-        data = data.to_bytes((data.bit_length()+7)//8,'big')
-        decrypted = decrypt_query_result(data, private_key)
-        decrtpted_r = recover_record_from_json(json.loads(decrypted))
+        plaintext = record_decryption(private_key, data)
+        decrtpted_r = recover_record_from_json(json.loads(plaintext))
         decrtpted_r.print_record()
         print("-------")
+
+def record_encryption(sKey, record_obj):
+    key = sKey
+    nonce = get_random_bytes(15)
+    cipher = AES.new(key, AES.MODE_OCB, nonce)
+    record_json = json.dumps(record_obj._as_dict_())
+    plaintext = record_json.encode()
+    ciphertext, mac = cipher.encrypt_and_digest(plaintext)
+    return [int.from_bytes(ciphertext, "big"), int.from_bytes(nonce, "big"),int.from_bytes(mac, "big")]
+
+def record_decryption(sKey, encrypted_record):
+    key=sKey.to_bytes((sKey.bit_length()+7)//8,'big')
+    ciphertext=encrypted_record[0].to_bytes((encrypted_record[0].bit_length()+7)//8,'big')
+    nonce=encrypted_record[1].to_bytes((encrypted_record[1].bit_length()+7)//8,'big')
+    mac=encrypted_record[2].to_bytes((encrypted_record[2].bit_length()+7)//8,'big')
+    cipher = AES.new(key, AES.MODE_OCB, nonce=nonce)
+    try:
+        plaintext = cipher.decrypt_and_verify(ciphertext, mac)
+    except ValueError:
+        # print ("Invalid message in the decryption right before output")
+        sys.exit("Invalid message")
+    else:
+        return plaintext

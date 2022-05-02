@@ -2,6 +2,8 @@ import hashlib
 import random
 from Crypto.Random import get_random_bytes
 from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Cipher import AES
 import json
 
 # https://stackoverflow.com/questions/51975664/serialize-and-deserialize-objects-from-user-defined-classes
@@ -30,6 +32,7 @@ class client():
         self.auth = None # [byte, byte]
         self.keypair = None # [str, str] AES prv, pub
         self.prvKey_hash = None # int
+        self.secretKey = None # str (byte str?)
         self.eventHistory = [] # [hash, hash ... ]
     
     def _as_dict_(self):
@@ -39,6 +42,7 @@ class client():
             'auth':[int.from_bytes(self.auth[0],'big'), int.from_bytes(self.auth[1],'big')],
             'keypair':self.keypair,
             'prvKey_hash':self.prvKey_hash,
+            'secretKey':int.from_bytes(self.secretKey,'big'),
             'eventHistory':self.eventHistory}
         return dic
 
@@ -49,15 +53,17 @@ class client():
         self.auth = self.auth_setup(pw) # salt(byte->int)，password_hash(byte->int)
         self.keypair = self.gen_key_pair() 
         self.prvKey_hash = self.set_prvkey_hash(self.keypair[1])
+        self.secretKey = self.gen_encrypt_s_key()
         self.eventHistory = []
     
-    def recover_client(self, role, ID, username, auth, keypair, prvKey_hash, eventHistory):
+    def recover_client(self, role, ID, username, auth, keypair, prvKey_hash, s_key, eventHistory):
         self.role = role # int
         self.ID = ID # int
         self.username = username # str
         self.auth = auth # [int, int] -> [byte, byte]
         self.keypair = keypair # [str, str]
         self.prvKey_hash = prvKey_hash # int
+        self.secretKey = s_key
         self.eventHistory = eventHistory # [hash, hash ... ]
 
     '''
@@ -80,6 +86,23 @@ class client():
         private_key = key.export_key()
         public_key = key.publickey().export_key()
         return [public_key.decode(), private_key.decode()] 
+    
+    # https://legrandin.github.io/pycryptodome/Doc/3.2/Crypto.Cipher._mode_ocb-module.html
+    def gen_encrypt_s_key(self):
+        secret_key = get_random_bytes(32)
+        pub_key = RSA.import_key(self.keypair[0].encode())
+        cipher = PKCS1_OAEP.new(pub_key)
+        encrypted_s_key = cipher.encrypt(secret_key)
+        return encrypted_s_key
+        
+    def decrypt_s_key(self):
+        key = RSA.import_key(self.keypair[1])
+        cipher = PKCS1_OAEP.new(key)
+        encrypted_sKey = self.secretKey
+        encrypted_sKey = encrypted_sKey.to_bytes((encrypted_sKey.bit_length()+7)//8,'big')
+        decrypted_key = cipher.decrypt(encrypted_sKey)
+        decrypted_key = int.from_bytes(decrypted_key, "big")
+        return decrypted_key # byte str
 
     # send this to query process unit
     def set_prvkey_hash(self,prv_key):
@@ -108,8 +131,8 @@ class audit_company(client):
         super().setup_new_client(username, pw)
         self.role = 1
     
-    def recover_audit(self, role, ID, username, auth, keypair, prvKey_hash, actionHistory):
-        super().recover_client(role, ID, username, auth, keypair, prvKey_hash, actionHistory)
+    def recover_audit(self, role, ID, username, auth, keypair, prvKey_hash, s_key, actionHistory):
+        super().recover_client(role, ID, username, auth, keypair, prvKey_hash, s_key, actionHistory)
         self.role = role
 
 class patient(client):
@@ -132,23 +155,32 @@ class patient(client):
         self.p_records = [] # only store record ID/hash
         self.p_records_use = [] # only store record ID/hash
     
-    def recover_patient(self, role, ID, username, auth, keypair, prvKey_hash, eventHistory, p_records, p_records_use):
-        super().recover_client(role, ID, username, auth, keypair, prvKey_hash, eventHistory)
+    def recover_patient(self, role, ID, username, auth, keypair, prvKey_hash, s_key, eventHistory, p_records, p_records_use):
+        super().recover_client(role, ID, username, auth, keypair, prvKey_hash, s_key, eventHistory)
         self.role = role
         self.p_records = p_records
         self.p_records_use = p_records_use
     
     def query_record(self, recordID):
         if recordID in self.p_records:
-            with open('query_record', 'w') as file:
-                file.write(str(recordID))
+            decrypted_s_key=super().decrypt_s_key()
+            content = [recordID,decrypted_s_key]
+            with open('query_record.json', 'w') as file:
+                json.dump(content, file)
         else:
             print("invalid record ID")
     
+    def query_reocrd_use(self, eventID):
+        if eventID in self.p_records_use:
+            with open('query_record_use', 'w') as file:
+                file.write(str(eventID))
+        else:
+            print("invalid record ID")
+
     def get_record_list(self):
         return self.p_records
 
-    def get_record_usage_get_record_list(self):
+    def get_record_usage(self):
         return self.p_records_use
     
     def add_pRecord(self,recordID):
@@ -180,10 +212,10 @@ def load_client():
 
 def load_patient(patient_json): # json_str
     p = patient()
-    p.recover_patient(patient_json['role'], patient_json['ID'], patient_json['username'], patient_json['auth'], patient_json['keypair'], patient_json['prvKey_hash'], patient_json['eventHistory'], patient_json['p_records'], patient_json['p_records_use'])
+    p.recover_patient(patient_json['role'], patient_json['ID'], patient_json['username'], patient_json['auth'], patient_json['keypair'], patient_json['prvKey_hash'], patient_json['secretKey'], patient_json['eventHistory'], patient_json['p_records'], patient_json['p_records_use'])
     return p
 
 def load_audit(audit_json):
     a = audit_company()
-    a.recover_audit(audit_json['role'], audit_json['ID'], audit_json['username'], audit_json['auth'], audit_json['keypair'], audit_json['prvKey_hash'], audit_json['eventHistory'])
+    a.recover_audit(audit_json['role'], audit_json['ID'], audit_json['username'], audit_json['auth'], audit_json['keypair'], audit_json['prvKey_hash'], audit_json['secretKey'], audit_json['eventHistory'])
     return a

@@ -4,6 +4,8 @@ from clientHandler import *
 from eventHandler import *
 from server import *
 from recordHandler import *
+from os import urandom
+from Crypto.Cipher import AES
 
 
 # 1 server stubs, 1 client stubs
@@ -15,7 +17,7 @@ client_verify = client_verify_unit()
 #=====Client Side
 # 5 patient, 2 audit
 patients = ['alice','bob','carol','dave','eve']
-aduit_companys = ['aduit1','audit2']
+aduit_companys = ['audit1','audit2']
 patients_list = []
 aduit_companys_list = []
 
@@ -37,11 +39,14 @@ for p in patients:
     # setup patient records
     r1 = record()
     r1.create_new_record(p_obj.ID,records_content[record_index])
-    record_storage.add_record(r1)
+    encrypted_record1 = record_encryption(p_obj.decrypt_s_key(), r1) 
+    record_storage.add_record(r1.recordID,encrypted_record1)
     p_obj.add_pRecord(r1.recordID)
+    
     r2 = record()
     r2.create_new_record(p_obj.ID,records_content[record_index+1])
-    record_storage.add_record(r2)
+    encrypted_record2 = record_encryption(p_obj.decrypt_s_key(), r2)
+    record_storage.add_record(r2.recordID,encrypted_record2)
     p_obj.add_pRecord(r2.recordID)
     record_index+=2
 
@@ -77,9 +82,6 @@ with open('events_list.json','w') as file:
     json.dump(events_dict,file)
 
 # export records
-records = record_storage.get_all_records()
-records_dict = []
-for r in records:
-    records_dict.append(r._as_dict_())
+records_dict = record_storage.get_all_records()
 with open('records_list.json','w') as file:
     json.dump(records_dict,file)
