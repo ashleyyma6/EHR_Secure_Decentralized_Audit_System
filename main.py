@@ -54,19 +54,16 @@ def exit_client(client_verify_unit):
     patients_list = []
     for c in client_list:
         if(c.role == 1):
-            aduit_companys_list.append(c._as_dict_())
+            aduit_companys_list.append(c._as_dict_export_())
         if (c.role == 2):
-            patients_list.append(c._as_dict_())  
+            patients_list.append(c._as_dict_export_())  
     with open('patients_list.json','w') as file:
         json.dump(patients_list,file)        
     with open('aduit_companys_list.json','w') as file:
         json.dump(aduit_companys_list,file)
 
 def exit_record(record_storage_unit):
-    records = record_storage_unit.get_all_records()
-    records_dict = []
-    for r in records:
-        records_dict.append(r._as_dict_())
+    records_dict = record_storage_unit.get_all_records()
     with open('records_list.json','w') as file:
         json.dump(records_dict,file)
 
@@ -136,9 +133,9 @@ def audit_query_all_record(audit_obj):
     patients = client_verify.client_dic.values()
     for p in patients:
         if(p.role == 2):
-            query_record(audit_obj,p)
-            # if(p.username!='bob'):
-            #     query_record(audit_obj,p)
+            # query_record(audit_obj,p)
+            if(p.username!='bob'):
+                query_record(audit_obj,p)
 
 # ===== Event history =====
 def get_event_history(requestor_obj, patient_obj):
@@ -182,7 +179,7 @@ def patient_menu(patient_obj):
         option = input("Enter your choice: ")
         if(option=='9'):
             print("Exit!")
-            #exit(query_process,record_storage,client_verify)
+            exit(query_process,record_storage,client_verify)
             exitFlag=True
         if(option=='0'):
             patient_obj.print_info()
@@ -199,7 +196,7 @@ def audit_menu(audit_obj):
         option = input("Enter your choice: ")
         if(option=='9'):
             print("Exit!")
-            #exit(query_process,record_storage,client_verify)
+            exit(query_process,record_storage,client_verify)
             exitFlag=True
         if(option=='0'):
             audit_obj.print_info()

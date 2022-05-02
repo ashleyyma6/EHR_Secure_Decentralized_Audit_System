@@ -45,6 +45,17 @@ class client():
             'secretKey':int.from_bytes(self.secretKey,'big'),
             'eventHistory':self.eventHistory}
         return dic
+    
+    def _as_dict_export_(self):
+        dic = {'role':self.role,
+            'ID': self.ID,
+            'username':self.username,
+            'auth':[self.auth[0], self.auth[1]],
+            'keypair':self.keypair,
+            'prvKey_hash':self.prvKey_hash,
+            'secretKey':self.secretKey,
+            'eventHistory':self.eventHistory}
+        return dic
 
     def setup_new_client(self, username, pw):
         self.role = 0
@@ -127,6 +138,11 @@ class audit_company(client):
         dic['role'] = self.role
         return dic
     
+    def _as_dict_export_(self):
+        dic = super()._as_dict_export_()
+        dic['role'] = self.role
+        return dic
+    
     def setup_new_audit(self, username, pw):
         super().setup_new_client(username, pw)
         self.role = 1
@@ -144,6 +160,13 @@ class patient(client):
     
     def _as_dict_(self):
         dic = super()._as_dict_()
+        dic['role'] = self.role
+        dic['p_records'] = self.p_records
+        dic['p_records_use'] = self.p_records_use
+        return dic
+    
+    def _as_dict_export_(self):
+        dic = super()._as_dict_export_()
         dic['role'] = self.role
         dic['p_records'] = self.p_records
         dic['p_records_use'] = self.p_records_use
